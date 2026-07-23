@@ -1,0 +1,22 @@
+{
+  "name": "tinynews-exchangerate",
+  "version": "1.0.0",
+  "description": "AI 환율 금융 분석 브리퍼 및 리더 웹 서비스",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "fetch": "node fetchExchangeRate.js"
+  },
+  "keywords": ["exchange-rate", "tinynews", "gemini-ai", "tts", "finance"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@google/generative-ai": "^0.21.0",
+    "dotenv": "^16.4.7",
+    "rss-parser": "^3.13.0",
+    "vite": "^6.0.7"
+  }
+}
