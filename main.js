@@ -1,239 +1,164 @@
-// tinynews Exchange Rate - Main Client Logic
+import './style.css';
 
-let currentData = null;
-let currentUtterance = null;
-let activePlayingCardId = null;
+const dateListEl = document.getElementById('date-list');
+const currentDateTitle = document.getElementById('current-date-title');
+const newsContainer = document.getElementById('news-container');
 
-const dateSelect = document.getElementById('dateSelect');
-const ratesGrid = document.getElementById('ratesGrid');
-const speakableTitleText = document.getElementById('speakableTitleText');
-const scriptCardsContainer = document.getElementById('scriptCardsContainer');
-const fullPlayBtn = document.getElementById('fullPlayBtn');
-const playBtnText = document.getElementById('playBtnText');
-const playIcon = document.getElementById('playIcon');
-
-// Init
-document.addEventListener('DOMContentLoaded', async () => {
-  setupTTSControls();
-  await loadAvailableDates();
-});
-
-// Load available dates from public/data/index.json
-async function loadAvailableDates() {
+async function init() {
   try {
-    const res = await fetch('./data/index.json');
-    if (!res.ok) throw new Error('index.json 로드 실패');
+    // 1. 저장된 날짜 목록(index.json) 불러오기
+    const res = await fetch(`${import.meta.env.BASE_URL}data/index.json`);
+    if (!res.ok) throw new Error('데이터를 불러올 수 없습니다.');
     const dates = await res.json();
-
-    if (!dates || dates.length === 0) {
-      dateSelect.innerHTML = '<option value="">데이터 없음</option>';
+    
+    if (dates.length === 0) {
+      currentDateTitle.textContent = "저장된 환율 리포트가 없습니다.";
       return;
     }
 
-    dateSelect.innerHTML = dates
-      .map(d => `<option value="${d}">${d}</option>`)
-      .join('');
+    // 2. 사이드바에 날짜 탭 렌더링
+    renderDateList(dates);
+    
+    // 3. 가장 최신 날짜의 뉴스 자동 로드
+    loadReportForDate(dates[0]);
 
-    // Load latest date
-    loadReport(dates[0]);
-
-    dateSelect.addEventListener('change', (e) => {
-      stopSpeech();
-      loadReport(e.target.value);
-    });
   } catch (err) {
-    console.error('날짜 목록 로드 중 오류:', err);
-    dateSelect.innerHTML = '<option value="">리포트 없음</option>';
-    speakableTitleText.textContent = '저장된 환율 리포트가 없습니다. 먼저 fetch 스크립트를 실행해 주세요.';
+    console.error(err);
+    currentDateTitle.textContent = "환율 데이터를 준비 중입니다.";
   }
 }
 
-// Load specific date report
-async function loadReport(dateStr) {
+function renderDateList(dates) {
+  dateListEl.innerHTML = '';
+  
+  dates.forEach((date, index) => {
+    const btn = document.createElement('div');
+    btn.className = `date-item ${index === 0 ? 'active' : ''}`;
+    
+    // 날짜 포맷팅 (YYYY-MM-DD -> YYYY. MM. DD.)
+    const [year, month, day] = date.split('-');
+    btn.textContent = `${year}. ${month}. ${day}.`;
+    
+    btn.addEventListener('click', () => {
+      // 메뉴 액티브 상태 전환
+      document.querySelectorAll('.date-item').forEach(el => el.classList.remove('active'));
+      btn.classList.add('active');
+      
+      loadReportForDate(date);
+    });
+    
+    dateListEl.appendChild(btn);
+  });
+}
+
+async function loadReportForDate(dateString) {
   try {
-    // Clear & skeleton
-    ratesGrid.innerHTML = `
-      <div class="skeleton-card"></div>
-      <div class="skeleton-card"></div>
-      <div class="skeleton-card"></div>
-      <div class="skeleton-card"></div>
-      <div class="skeleton-card"></div>
-    `;
-    scriptCardsContainer.innerHTML = `
-      <div class="skeleton-card large"></div>
-      <div class="skeleton-card large"></div>
-    `;
-    speakableTitleText.textContent = '리포트 불러오는 중...';
-
-    const res = await fetch(`./data/${dateStr}.json`);
-    if (!res.ok) throw new Error(`${dateStr}.json 로드 실패`);
-    currentData = await res.json();
-
-    renderReport(currentData);
-  } catch (err) {
-    console.error('리포트 상세 로드 중 오류:', err);
-    speakableTitleText.textContent = '리포트 데이터를 불러오지 못했습니다.';
-  }
-}
-
-// Render report contents
-function renderReport(data) {
-  // 1. Speakable Title
-  speakableTitleText.textContent = data.speakableTitle || '오늘의 환율 브리핑입니다.';
-
-  // 2. Ticker Rates Grid
-  if (data.rates && Array.isArray(data.rates)) {
-    ratesGrid.innerHTML = data.rates.map(rate => {
-      let changeClass = 'flat';
-      let changeSign = '';
-      if (rate.change === '상승' || (rate.changeText && rate.changeText.includes('+'))) {
-        changeClass = 'up';
-        changeSign = '▲ ';
-      } else if (rate.change === '하락' || (rate.changeText && rate.changeText.includes('-'))) {
-        changeClass = 'down';
-        changeSign = '▼ ';
-      }
-
-      return `
-        <div class="rate-card">
-          <div class="rate-header">
-            <div class="currency-info">
-              <div class="currency-symbol">${rate.symbol || '$'}</div>
-              <span class="currency-name">${rate.name || rate.code}</span>
-            </div>
-            <span class="change-badge ${changeClass}">${changeSign}${rate.changeText || rate.change}</span>
-          </div>
-          <div class="rate-value">
-            ${rate.value} <span class="rate-unit">원</span>
-          </div>
-        </div>
-      `;
-    }).join('');
-  }
-
-  // 3. Script Cards
-  if (data.script && Array.isArray(data.script)) {
-    scriptCardsContainer.innerHTML = data.script.map(item => `
-      <div class="script-card" id="script-card-${item.id}">
-        <div class="script-card-header">
-          <span class="script-tag">PART ${item.id}</span>
-          <button class="play-btn section-play-btn" data-id="${item.id}">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-              <polygon points="5 3 19 12 5 21 5 3"></polygon>
-            </svg>
-            <span>이 단락 듣기</span>
-          </button>
-        </div>
-        <h3 class="script-speakable-title">${item.speakableTitle}</h3>
-        <p class="script-content">${item.detailedSummary}</p>
-      </div>
-    `).join('');
-
-    // Attach section play listeners
-    document.querySelectorAll('.section-play-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const id = parseInt(e.currentTarget.getAttribute('data-id'), 10);
-        toggleSectionSpeech(id);
-      });
-    });
-  }
-}
-
-// TTS Speech Control (Web Speech API)
-function setupTTSControls() {
-  fullPlayBtn.addEventListener('click', () => {
-    if ('speechSynthesis' in window && window.speechSynthesis.speaking) {
-      stopSpeech();
-    } else {
-      playFullSpeech();
+    const [year, month, day] = dateString.split('-');
+    currentDateTitle.textContent = `${year}년 ${month}월 ${day}일 환율 동향`;
+    newsContainer.innerHTML = '<p style="color: var(--text-tertiary);">환율 리포트를 불러오는 중입니다...</p>';
+    
+    // 특정 날짜의 JSON 데이터 패치
+    const res = await fetch(`${import.meta.env.BASE_URL}data/${dateString}.json`);
+    if (!res.ok) throw new Error('리포트를 찾을 수 없습니다.');
+    const reportData = await res.json();
+    
+    newsContainer.innerHTML = '';
+    
+    // 1. 전체 요약 (speakableTitle)
+    if (reportData.speakableTitle) {
+      const summaryEl = document.createElement('article');
+      summaryEl.className = 'news-item';
+      
+      const summaryTitle = document.createElement('h3');
+      summaryTitle.className = 'news-title';
+      summaryTitle.textContent = "오늘의 핵심 요약";
+      
+      const summaryText = document.createElement('p');
+      summaryText.className = 'news-snippet';
+      summaryText.textContent = reportData.speakableTitle;
+      
+      summaryEl.appendChild(summaryTitle);
+      summaryEl.appendChild(summaryText);
+      newsContainer.appendChild(summaryEl);
     }
-  });
-}
 
-function playFullSpeech() {
-  if (!currentData || !('speechSynthesis' in window)) {
-    alert('이 브라우저에서는 음성 합성(TTS)이 지원되지 않습니다.');
-    return;
-  }
+    // 2. 주요 통화 매매기준율 (rates)
+    if (reportData.rates && reportData.rates.length > 0) {
+      const ratesEl = document.createElement('article');
+      ratesEl.className = 'news-item';
+      
+      const ratesTitle = document.createElement('h3');
+      ratesTitle.className = 'news-title';
+      ratesTitle.textContent = "주요 통화 환율";
+      ratesEl.appendChild(ratesTitle);
 
-  stopSpeech();
+      const ratesList = document.createElement('ul');
+      ratesList.style.listStyleType = 'none';
+      ratesList.style.paddingLeft = '0';
+      ratesList.style.marginTop = '0.5rem';
 
-  const textToRead = [
-    currentData.speakableTitle,
-    ...currentData.script.map(s => `${s.speakableTitle}. ${s.detailedSummary}`)
-  ].join(' ');
+      reportData.rates.forEach(rate => {
+        const li = document.createElement('li');
+        li.style.marginBottom = '0.4rem';
+        li.style.fontSize = '1.05rem';
+        li.style.color = 'var(--text-secondary)';
+        
+        let changeText = rate.changeText || rate.change;
+        let changeSign = '';
+        if (rate.change === '상승' || (changeText && changeText.includes('+'))) {
+          changeSign = '▲ ';
+          changeText = `<span style="color: #ff4444;">${changeSign}${changeText}</span>`;
+        } else if (rate.change === '하락' || (changeText && changeText.includes('-'))) {
+          changeSign = '▼ ';
+          changeText = `<span style="color: #4444ff;">${changeSign}${changeText}</span>`;
+        } else {
+          changeText = `<span>${changeText}</span>`;
+        }
 
-  speakText(textToRead, () => {
-    updatePlayBtnState(false);
-    clearCardHighlights();
-  });
+        li.innerHTML = `<strong>${rate.name || rate.code}</strong> (${rate.symbol || '$'}): ${rate.value} 원 &nbsp; ${changeText}`;
+        ratesList.appendChild(li);
+      });
 
-  updatePlayBtnState(true);
-}
-
-function toggleSectionSpeech(id) {
-  if ('speechSynthesis' in window && window.speechSynthesis.speaking && activePlayingCardId === id) {
-    stopSpeech();
-    return;
-  }
-
-  stopSpeech();
-
-  const item = currentData.script.find(s => s.id === id);
-  if (!item) return;
-
-  const cardElem = document.getElementById(`script-card-${id}`);
-  if (cardElem) cardElem.classList.add('active-speech');
-  activePlayingCardId = id;
-
-  const textToRead = `${item.speakableTitle}. ${item.detailedSummary}`;
-  speakText(textToRead, () => {
-    if (cardElem) cardElem.classList.remove('active-speech');
-    activePlayingCardId = null;
-  });
-}
-
-function speakText(text, onEndCallback) {
-  currentUtterance = new SpeechSynthesisUtterance(text);
-  currentUtterance.lang = 'ko-KR';
-  currentUtterance.rate = 1.0;
-  currentUtterance.pitch = 1.0;
-
-  currentUtterance.onend = () => {
-    if (onEndCallback) onEndCallback();
-  };
-
-  currentUtterance.onerror = (e) => {
-    console.error('TTS 오류:', e);
-    stopSpeech();
-  };
-
-  window.speechSynthesis.speak(currentUtterance);
-}
-
-function stopSpeech() {
-  if ('speechSynthesis' in window) {
-    window.speechSynthesis.cancel();
-  }
-  updatePlayBtnState(false);
-  clearCardHighlights();
-  activePlayingCardId = null;
-}
-
-function updatePlayBtnState(isPlaying) {
-  if (isPlaying) {
-    fullPlayBtn.classList.add('playing');
-    playBtnText.textContent = '음성 재생 정지';
-    playIcon.innerHTML = '<rect x="6" y="6" width="12" height="12"></rect>';
-  } else {
-    fullPlayBtn.classList.remove('playing');
-    playBtnText.textContent = '전체 대본 음성 듣기';
-    playIcon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"></polygon>';
+      ratesEl.appendChild(ratesList);
+      newsContainer.appendChild(ratesEl);
+    }
+    
+    // 3. AI 상세 스크립트 파트 (script)
+    if (reportData.script && reportData.script.length > 0) {
+      reportData.script.forEach(item => {
+        const articleEl = document.createElement('article');
+        articleEl.className = 'news-item';
+        
+        const publisherEl = document.createElement('div');
+        publisherEl.className = 'news-publisher';
+        publisherEl.textContent = `PART ${item.id}`;
+        
+        const titleEl = document.createElement('h3');
+        titleEl.className = 'news-title';
+        titleEl.textContent = item.speakableTitle || item.originalTitle;
+        
+        articleEl.appendChild(publisherEl);
+        articleEl.appendChild(titleEl);
+        
+        if (item.detailedSummary) {
+          const snippetEl = document.createElement('p');
+          snippetEl.className = 'news-snippet';
+          snippetEl.textContent = item.detailedSummary; 
+          articleEl.appendChild(snippetEl);
+        }
+        
+        newsContainer.appendChild(articleEl);
+      });
+    }
+    
+    // 모바일 환경 등에서 다른 날짜 클릭 시 부드럽게 상단으로 스크롤 이동
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    
+  } catch (err) {
+    console.error(err);
+    newsContainer.innerHTML = '<p style="color: #ff4444;">데이터를 불러오는 중 오류가 발생했습니다.</p>';
   }
 }
 
-function clearCardHighlights() {
-  document.querySelectorAll('.script-card').forEach(card => {
-    card.classList.remove('active-speech');
-  });
-}
+// 앱 시작
+init();

@@ -1,108 +1,34 @@
 <!DOCTYPE html>
 <html lang="ko">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>tinynews - AI 환율 브리핑</title>
-  <meta name="description" content="매일의 주요 통화 환율과 외환 시장 동향을 AI가 분석하고 친절한 음성 대본으로 전달하는 프리미엄 금융 브리핑 서비스">
-  
-  <!-- Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
-  
-  <link rel="stylesheet" href="./style.css">
-</head>
-<body>
-  <div class="app-container">
-    <!-- Header -->
-    <header class="app-header">
-      <div class="header-content">
-        <div class="logo-area">
-          <span class="logo-badge">AI FINANCE</span>
-          <h1>tinynews <span class="accent-text">Exchange Rate</span></h1>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- 프리미엄 리더 스타일을 위한 구글 폰트 적용 (Noto Serif KR + Pretendard) -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+    <title>Sullivan Exchange Rate Reader</title>
+  </head>
+  <body>
+    <div id="app">
+      <!-- 좌측 사이드바: 날짜 리스트 -->
+      <aside class="sidebar">
+        <h1 class="logo">Sullivan.</h1>
+        <p class="subtitle">Daily Exchange Rate</p>
+        <nav id="date-list" class="date-list">
+          <!-- JS에서 동적으로 생성됨 -->
+        </nav>
+      </aside>
+
+      <!-- 우측 메인 콘텐츠: 뉴스 리더 영역 -->
+      <main class="content">
+        <header class="content-header">
+          <h2 id="current-date-title">Loading...</h2>
+        </header>
+        <div id="news-container" class="news-container">
+          <!-- JS에서 환율이 렌더링됨 -->
         </div>
-        <p class="subtitle">AI가 매일 분석하는 실시간 환율 & 음성 외환 브리핑</p>
-      </div>
-
-      <div class="header-controls">
-        <div class="date-select-wrapper">
-          <label for="dateSelect" class="date-label">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-              <line x1="16" y1="2" x2="16" y2="6"></line>
-              <line x1="8" y1="2" x2="8" y2="6"></line>
-              <line x1="3" y1="10" x2="21" y2="10"></line>
-            </svg>
-            리포트 일자
-          </label>
-          <select id="dateSelect" class="date-select">
-            <option value="">로딩 중...</option>
-          </select>
-        </div>
-      </div>
-    </header>
-
-    <!-- Main Content Grid -->
-    <main class="main-layout">
-      <!-- Rates Ticker Grid -->
-      <section class="ticker-section" id="tickerSection">
-        <h2 class="section-title">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="12" y1="1" x2="12" y2="23"></line>
-            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-          </svg>
-          주요 통화 매매기준율
-        </h2>
-        <div class="rates-grid" id="ratesGrid">
-          <!-- Cards injected dynamically -->
-          <div class="skeleton-card"></div>
-          <div class="skeleton-card"></div>
-          <div class="skeleton-card"></div>
-          <div class="skeleton-card"></div>
-          <div class="skeleton-card"></div>
-        </div>
-      </section>
-
-      <!-- Speakable Title Banner & Global TTS Control -->
-      <section class="banner-section" id="bannerSection">
-        <div class="headline-card">
-          <div class="headline-header">
-            <span class="pulse-icon"></span>
-            <h3>오늘의 핵심 한 줄 요약</h3>
-            <button id="fullPlayBtn" class="play-btn primary-play-btn" id="mainPlayBtn">
-              <svg id="playIcon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                <polygon points="5 3 19 12 5 21 5 3"></polygon>
-              </svg>
-              <span id="playBtnText">전체 대본 음성 듣기</span>
-            </button>
-          </div>
-          <p id="speakableTitleText" class="speakable-text">환율 리포트를 선택하는 중입니다...</p>
-        </div>
-      </section>
-
-      <!-- AI Script Sections -->
-      <section class="script-section">
-        <h2 class="section-title">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-          </svg>
-          AI 외환 분석 리포트 대본
-        </h2>
-        <div class="script-cards-container" id="scriptCardsContainer">
-          <div class="skeleton-card large"></div>
-          <div class="skeleton-card large"></div>
-        </div>
-      </section>
-    </main>
-
-    <!-- Footer -->
-    <footer class="app-footer">
-      <p>© 2026 <strong>tinynews exchange rate</strong>. Powered by Google Gemini 2.5 Flash API & Serverless GitOps Pipeline.</p>
-    </footer>
-  </div>
-
-  <script type="module" src="./main.js"></script>
-</body>
+      </main>
+    </div>
+    <script type="module" src="/main.js"></script>
+  </body>
 </html>
